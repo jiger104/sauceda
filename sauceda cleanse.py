@@ -45,11 +45,12 @@ def transform(event):
     event['Dist Channel'] = fix_shiphero_dist(event)
     event['Label Type'] = fix_shiphero_label(event)
     event['Tracking Number'] = fix_shiphero_tracking(event)
+    return event
 
 #cleanse shiphero void report
   if event['_metadata']['input_label'] == 'ShipHero_ShipmentsReport_VOID':
-     event['Label Status'] = "Void"
-
+    event['Label Status'] = "Void"
+    return event
 
 #cleanse fedex input. standardize dates and times
   if event['_metadata']['input_label'] == 'Fedex_aws':
@@ -89,7 +90,7 @@ def transform(event):
 #cleanse shipstation input. standardize dates
   if event['_metadata']['input_label'] == 'Shipstation_aws':
     event = fix_date(event)
-  return event
+    return event
 
 
 
