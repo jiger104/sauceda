@@ -40,11 +40,11 @@ def transform(event):
 #cleanse shiphero input. standardize dates, quantities (as integer), column for dist channel,label type, and random tracking number for those orders without one
   if event['_metadata']['input_label'] == 'Shiphero_ShipmentsReport':
     event = fix_date(event)
-    event['Quantity Shipped'] = int(event['Quantity Shipped'])
+    event['Label Status'] = "Valid"
+    event['Quantity Shipped Error'] = fix_shiphero_qty(event)
     event['Dist Channel'] = fix_shiphero_dist(event)
     event['Label Type'] = fix_shiphero_label(event)
     event['Tracking Number'] = fix_shiphero_tracking(event)
-    event['Label Status'] = "Valid"
 
 #cleanse shiphero void report
   if event['_metadata']['input_label'] == 'ShipHero_ShipmentsReport_VOID':
@@ -113,28 +113,40 @@ def fix_postage(y):
 #add a column to shiphero for dist channel. ecomm or wholesale based on condition below
 def fix_shiphero_dist(event):
   r = int(event['Quantity Shipped'])
-  h = event['Store']
   o = str(event['Order Number'])
-  if (any (k in event['3PL Customer'] for k in ("Howler Bros", "Kammok Operations"))) and (any (j in o[:2] for j in ("KW", "IF"))):
-    g = "Wholesale"
+  c = event['3PL Customer']
+  h = event['Store']
+  if c == "Howler Bros" and o[:2] == "IF":
+    g = "Wholesale B2B"
+  elif c == "Kammok Operations" and o[:2] == "KW":
+    g = "Wholesale B2B"
   elif o[:4] != "EXC-" and r >= 10 and h == "Manual Order":
-    g = "Wholesale"
+    g = "Wholesale B2B"
   else:
-    g = "E-Commerce"
+    g = "E-Commerce B2C"
   return g
 
 #delete first 8 characters of tracking number of  any DHL domestic shipment on shiphero report, Also add random integer for orders with no tracking number
 def fix_shiphero_tracking(event):
     m = event['Method']
-    c = event['Carrier']
     t = event['Tracking Number']
-    if m[:6] == "DHL SM" and (any (j in c[:3] for j in ("DHL", "dhl"))):
+    if m[:6] == "DHL SM":
       return t[8:]
     elif t == "Add a tracking number":
       t = random.randint(99999,999999)
       return t
     else:
       return t
+
+#add in label for items with 0 qty in shiphero shipments report
+def fix_shiphero_qty(event):
+    q = int(event['Quantity Shipped'])
+    if q == 0:
+        e = "True"
+        return e
+    else:
+        return "False"
+
 
 
 #add a column to shiphero for label type. inbound or outbound based on condition below for tecovas return labels
