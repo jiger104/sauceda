@@ -148,7 +148,6 @@ def fix_shiphero_qty(event):
         return "False"
 
 
-
 #add a column to shiphero for label type. inbound or outbound based on condition below for tecovas return labels
 def fix_shiphero_label(event):
   r = event['Method']
