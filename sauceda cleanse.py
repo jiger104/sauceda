@@ -47,7 +47,7 @@ def transform(event):
 #cleanse fedex input. standardize dates and times
   if event['_metadata']['input_label'] == 'Fedex_InvoiceDetail':
      event = fix_date(event)
-
+     return event
 
 #cleanse dhl input. add headers to the csv, remove the first row of the input since it is junk data and standardize dates and times
   if event['_metadata']['input_label'] == 'DHLe-commerce_InvoiceDetail':
@@ -97,18 +97,13 @@ def fix_endicia_postage(event):
   t = event['Total Postage Amt']
   if any(k in r for k in ("Refunded", "Refund Rejected")):
       t = 0
+      return t
   else:
       if t.startswith('$'):
           z = t.replace(",","")
           return float(z[1:])
       return float(t)
 
-
-# if there are any endicia refunds or refunds rejected set the total postage to 0 otherwise make total postage a float value
-if any(k in event['Refund Status'] for k in ("Refunded", "Refund Rejected")):
-    event['Total Postage Amt'] = 0
-else:
-    event['Total Postage Amt'] = fix_postage(event['Total Postage Amt'])
 
 #add a column to shiphero for dist channel. ecomm or wholesale based on condition below
 def fix_shiphero_dist(event):
