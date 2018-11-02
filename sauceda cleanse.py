@@ -21,6 +21,7 @@ def transform(event):
 
 #cleanse endicia input. remove event types of postage purchase and refund, cleanse tracking number and standardize date and time formats
   if event['_metadata']['input_label'] == 'Endicia_aws':
+     event['Total Postage Amt'] = fix_endicia_postage(event)
 
     if any (k in event['Type'] for k in ("Postage Purchase", "Postage Refund")):
       return None
@@ -28,12 +29,6 @@ def transform(event):
     else:
       event['Tracking Number'] = fix_quote(event['Tracking Number'])
       event = fix_date(event)
-
-      #if there are any endicia refunds or refunds rejected set the total postage to 0 otherwise make total postage a float value
-      if any (k in event['Refund Status'] for k in ("Refunded", "Refund Rejected")):
-            event['Total Postage Amt'] = 0
-      else:
-            event['Total Postage Amt'] = fix_postage(event['Total Postage Amt'])
 
       return event
 
@@ -103,13 +98,25 @@ def transform(event):
 def fix_quote(x):
   return x.replace("'","")
 
-#change endicia postage to float value
-def fix_postage(y):
-  if y.startswith('$'):
-    z = y.replace(",","")
-    return float(z[1:])
-  return float(y)
+#change endicia postage to float value or 0 based on refund status
+def fix_endicia_postage(event):
+  r = event['Refund Status']
+  t = event['Total Postage Amt']
+  if any(k in r for k in ("Refunded", "Refund Rejected")):
+      t = 0
+  else:
+      if t.startswith('$'):
+          z = t.replace(",","")
+          return float(z[1:])
+      return float(t)
 
+
+
+# if there are any endicia refunds or refunds rejected set the total postage to 0 otherwise make total postage a float value
+if any(k in event['Refund Status'] for k in ("Refunded", "Refund Rejected")):
+    event['Total Postage Amt'] = 0
+else:
+    event['Total Postage Amt'] = fix_postage(event['Total Postage Amt'])
 
 #add a column to shiphero for dist channel. ecomm or wholesale based on condition below
 def fix_shiphero_dist(event):
