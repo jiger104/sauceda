@@ -2,12 +2,10 @@
 Alooma's Code Engine allows you to write whatever custom code
 you choose to cleanse, enrich, split, delete, make calls out,
 and do whatever is possible with native Python code that you desire!
-
 While we ship with just the standard "def transform(event)" function,
 we've written some common code examples below for you to work from.
 Check out our Code Engine docs for even more!
 https://support.alooma.com/hc/en-us/articles/360000698651
-
 If you have any questions about writing code,
 or want to import a custom library,
 feel free to contact us at support@alooma.com
@@ -32,12 +30,13 @@ def transform(event):
 
 #cleanse shiphero input. standardize dates, quantities (as integer), column for dist channel,label type, and random tracking number for those orders without one
   if input == 'Shiphero_ShipmentsReport':
-    event = fix_date(event)
     event['Label Status'] = "Valid"
     event['Quantity Shipped Error'] = fix_shiphero_qty(event)
     event['Dist Channel'] = fix_shiphero_dist(event)
     event['Label Type'] = fix_shiphero_label(event)
     event['Tracking Number'] = fix_shiphero_tracking(event)
+    event['Unique Shipment'] = fix_shiphero_unique(event)
+    event = fix_date(event)
     return event
 
 #cleanse shiphero void report
@@ -121,6 +120,15 @@ def fix_shiphero_dist(event):
     g = "E-Commerce B2C"
   return g
 
+#concatenate shiphero created date and order date as unique shipment field
+def fix_shiphero_unique(event):
+    o = event['Order Number']
+    c = event['Created Date']
+    c = (datetime.strptime(event['Created Date'], '%m/%d/%Y %I:%M %p'))
+    d = datetime.strftime(c, '%m%d%Y')
+    return (o + " " + str(d))
+
+
 #delete first 8 characters of tracking number of  any DHL domestic shipment on shiphero report, Also add random integer for orders with no tracking number
 def fix_shiphero_tracking(event):
     m = event['Method']
@@ -191,8 +199,6 @@ def fix_date(event):
     if input == "TSheets_EmployeeJobCosting":
        event['date'] = str(datetime.strptime(event['date'], '%Y-%d-%m'))
        return event
-
-
 
 
 
