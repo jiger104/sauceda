@@ -21,15 +21,12 @@ def transform(event):
 
 #cleanse endicia input. remove event types of postage purchase and refund, cleanse tracking number and standardize date and time formats
   if event['_metadata']['input_label'] == 'Endicia_aws':
-     event['Total Postage Amt'] = fix_endicia_postage(event)
-
     if any (k in event['Type'] for k in ("Postage Purchase", "Postage Refund")):
       return None
-
     else:
-      event['Tracking Number'] = fix_quote(event['Tracking Number'])
+      event['Tracking Number'] = event['Tracking Number'].replace("'","")
+      event['Total Postage Amt'] = fix_endicia_postage(event)
       event = fix_date(event)
-
       return event
 
 #cleanse shiphero input. standardize dates, quantities (as integer), column for dist channel,label type, and random tracking number for those orders without one
@@ -94,10 +91,6 @@ def transform(event):
 #functions
 #---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-#remove quotes from endicia tracking number
-def fix_quote(x):
-  return x.replace("'","")
-
 #change endicia postage to float value or 0 based on refund status
 def fix_endicia_postage(event):
   r = event['Refund Status']
@@ -109,7 +102,6 @@ def fix_endicia_postage(event):
           z = t.replace(",","")
           return float(z[1:])
       return float(t)
-
 
 
 # if there are any endicia refunds or refunds rejected set the total postage to 0 otherwise make total postage a float value
