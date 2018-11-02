@@ -125,7 +125,7 @@ def fix_shiphero_unique(event):
     o = event['Order Number']
     c = (datetime.strptime(event['Created Date'], '%m/%d/%Y %I:%M %p'))
     d = datetime.strftime(c, '%m%d%Y')
-    return (o + " " + str(d))
+    return (o + " - " + str(d))
     
 
 #delete first 8 characters of tracking number of  any DHL domestic shipment on shiphero report, Also add random integer for orders with no tracking number
