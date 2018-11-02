@@ -20,7 +20,7 @@ import csv, io
 def transform(event):
 
 #cleanse endicia input. remove event types of postage purchase and refund, cleanse tracking number and standardize date and time formats
-  if event['_metadata']['input_label'] == 'Endicia_aws':
+  if event['_metadata']['input_label'] == 'Endicia_InvoiceDetail':
     if any (k in event['Type'] for k in ("Postage Purchase", "Postage Refund")):
       return None
     else:
@@ -45,12 +45,12 @@ def transform(event):
     return event
 
 #cleanse fedex input. standardize dates and times
-  if event['_metadata']['input_label'] == 'Fedex_aws':
+  if event['_metadata']['input_label'] == 'Fedex_InvoiceDetail':
      event = fix_date(event)
 
 
 #cleanse dhl input. add headers to the csv, remove the first row of the input since it is junk data and standardize dates and times
-  if event['_metadata']['input_label'] == 'DHL_ftp':
+  if event['_metadata']['input_label'] == 'DHLe-commerce_InvoiceDetail':
     headers = ["Record Type", "Sold To", "Inventory Positioner", "BOL Number", "Billing Ref", "Billing Ref 2", "Processing Facility", "Pick From", "Pickup Date", "Pickup Time", "Internal Tracking", "Customer Confirm", "Delivery Confirm", "Recipient Name",
     "Recipient Address 1", "Recipient Address 2", "Recipient City", "Recipient State", "Recipient Zip", "Recipient Country", "VAS Num", "VAS Dec", "Actual Weight", "UOM Actual Weight", "Billing Weight", "UOM Billing Weight", "Quantity", "UOM Quantity", "Pricing Zone", "Charge", "Customer Reference"]
     string = event['message']
@@ -71,7 +71,7 @@ def transform(event):
 
 
 #cleanse tsheets input to split data into columns and add date to each row
-  if event['_metadata']['input_label'] == 'Tsheets_aws':
+  if event['_metadata']['input_label'] == 'TSheets_EmployeeJobCosting':
       event['date'] = event['_metadata']['file_name'].replace('Tsheets/',"").replace('.csv', "")
       event['project'] = event['original_row'][0].split(" >>")[0]
       event['job_code'] = event['original_row'][0].split(">> ")[1]
@@ -160,14 +160,15 @@ def fix_shiphero_label(event):
 
 #global function to fix date formatting
 def fix_date(event):
-    if event['_metadata']['input_label'] == 'Shipstation_aws':
+    x = event['_metadata']['input_label']
+    if x == 'Shipstation_aws':
       try:
          event['Date - Shipped Date'] = str(datetime.strptime(event['Date - Shipped Date'], '%m/%d/%Y %I:%M:%S %p'))
       except:
          event['Date - Shipped Date'] = str(datetime.strptime(event['Date - Shipped Date'], '%m/%d/%Y %H:%M'))
       return event
 
-    if event['_metadata']['input_label'] == "Endicia_aws":
+    if x == "Endicia_InvoiceDetail":
       if event['Postmark'] and event['Date/Time']:
         event['Postmark'] = str(datetime.strptime(event['Postmark'], '%m/%d/%y'))
         event['Date/Time'] = str(datetime.strptime(event['Date/Time'], ' %m/%d/%y-%I:%M:%S:%p'))
@@ -176,7 +177,7 @@ def fix_date(event):
         event['Postmark'] = event['Date/Time']
       return event
 
-    if event['_metadata']['input_label'] == 'Fedex_aws':
+    if x == 'Fedex_InvoiceDetail':
 
       event['Invoice Month (yyyymm)'] = str(datetime.strptime(event['Invoice Month (yyyymm)'], '%Y%m'))
 
@@ -188,12 +189,12 @@ def fix_date(event):
         event['Shipment Delivery Date'] = event['Shipment Date']
       return event
 
-    if event['_metadata']['input_label'] == 'Shiphero_ShipmentsReport':
+    if x == 'Shiphero_ShipmentsReport' or x == 'Shiphero_ShipmentsReport_VOID':
         event['Order Date'] = str(datetime.strptime(event['Order Date'], '%m/%d/%Y %I:%M %p'))
         event['Created Date'] = str(datetime.strptime(event['Created Date'], '%m/%d/%Y %I:%M %p'))
         return event
 
-    if event['_metadata']['input_label'] == "Tsheets_aws":
+    if x == "TSheets_EmployeeJobCosting":
        event['date'] = str(datetime.strptime(event['date'], '%Y-%d-%m'))
        return event
 
