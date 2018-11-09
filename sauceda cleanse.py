@@ -32,7 +32,8 @@ import csv, io
 def transform(event):
   input = event['_metadata']['input_label']
 
-#cleanse endicia input. remove event types of postage purchase and refund, cleanse tracking number and standardize date and time formats
+#cleanse endicia input. remove event types of postage purchase and refund, cleanse tracking
+# number and standardize date and time formats
   if input == 'Endicia_InvoiceDetail':
     if any (k in event['Type'] for k in ("Postage Purchase", "Postage Refund")):
       return None
@@ -42,7 +43,8 @@ def transform(event):
       event = fix_date(event)
       return event
 
-#cleanse shiphero input. standardize dates, quantities (as integer), column for dist channel,label type, and random tracking number for those orders without one
+#cleanse shiphero input. standardize dates, quantities (as integer), column for dist channel,label type,
+# and random tracking number for those orders without one
   if input == 'Shiphero_ShipmentsReport':
     event['Label Status'] = "Valid"
     event['Quantity Shipped Error'] = fix_shiphero_qty(event)
@@ -63,10 +65,15 @@ def transform(event):
      event = fix_date(event)
      return event
 
-#cleanse dhl input. add headers to the csv, remove the first row of the input since it is junk data and standardize dates and times
+#cleanse dhl input. add headers to the csv, remove the first row of the input since it is junk data and standardize
+# dates and times
   if input == 'DHLe-commerce_InvoiceDetail':
-    headers = ["Record Type", "Sold To", "Inventory Positioner", "BOL Number", "Billing Ref", "Billing Ref 2", "Processing Facility", "Pick From", "Pickup Date", "Pickup Time", "Internal Tracking", "Customer Confirm", "Delivery Confirm", "Recipient Name",
-    "Recipient Address 1", "Recipient Address 2", "Recipient City", "Recipient State", "Recipient Zip", "Recipient Country", "VAS Num", "VAS Dec", "Actual Weight", "UOM Actual Weight", "Billing Weight", "UOM Billing Weight", "Quantity", "UOM Quantity", "Pricing Zone", "Charge", "Customer Reference"]
+    headers = ["Record Type", "Sold To", "Inventory Positioner", "BOL Number", "Billing Ref", "Billing Ref 2",
+               "Processing Facility", "Pick From", "Pickup Date", "Pickup Time", "Internal Tracking", "Customer Confirm",
+               "Delivery Confirm", "Recipient Name","Recipient Address 1", "Recipient Address 2", "Recipient City",
+               "Recipient State", "Recipient Zip", "Recipient Country", "VAS Num", "VAS Dec", "Actual Weight",
+               "UOM Actual Weight", "Billing Weight", "UOM Billing Weight", "Quantity", "UOM Quantity", "Pricing Zone",
+               "Charge", "Customer Reference"]
     string = event['message']
     metadata = event['_metadata']
     f = io.StringIO(string)
@@ -103,7 +110,7 @@ def transform(event):
 
 
 #functions
-#---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------------------------------------------------
 
 #change endicia postage to float value or 0 based on refund status
 def fix_endicia_postage(event):
@@ -142,7 +149,8 @@ def fix_shiphero_unique(event):
     return (o + "-" + str(d))
     
 
-#delete first 8 characters of tracking number of  any DHL domestic shipment on shiphero report, Also add random integer for orders with no tracking number
+#delete first 8 characters of tracking number of  any DHL domestic shipment on shiphero report, Also add random integer
+#for orders with no tracking number
 def fix_shiphero_tracking(event):
     m = event['Method']
     t = event['Tracking Number']
