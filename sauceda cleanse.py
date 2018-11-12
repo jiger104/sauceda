@@ -29,6 +29,7 @@ feel free to contact us at support@alooma.com
 import io
 import csv
 import random
+from dateutil import parser
 from datetime import datetime
 
 def transform(event):
