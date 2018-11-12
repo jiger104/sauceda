@@ -3,12 +3,10 @@
 Alooma's Code Engine allows you to write whatever custom code
 you choose to cleanse, enrich, split, delete, make calls out,
 and do whatever is possible with native Python code that you desire!
-
 While we ship with just the standard "def transform(event)" function,
 we've written some common code examples below for you to work from.
 Check out our Code Engine docs for even more!
 https://support.alooma.com/hc/en-us/articles/360000698651
-
 If you have any questions about writing code,
 or want to import a custom library,
 feel free to contact us at support@alooma.com
@@ -152,7 +150,7 @@ def fix_shiphero_dist(event):
 def fix_shiphero_unique(event):
     o = event['Order Number']
     c = (datetime.strptime(event['Created Date'], '%m/%d/%Y %I:%M %p'))
-    d = datetime.strftime(c, '%m%d%Y')
+    d = datetime.strftime(c, '%m%d%Y-%I%M%p')
     return (o + "-" + str(d))
 
 
