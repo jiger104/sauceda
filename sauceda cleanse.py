@@ -1,52 +1,27 @@
-
-'''
-Alooma's Code Engine allows you to write whatever custom code
-you choose to cleanse, enrich, split, delete, make calls out,
-and do whatever is possible with native Python code that you desire!
-While we ship with just the standard "def transform(event)" function,
-we've written some common code examples below for you to work from.
-Check out our Code Engine docs for even more!
-https://support.alooma.com/hc/en-us/articles/360000698651
-If you have any questions about writing code,
-or want to import a custom library,
-feel free to contact us at support@alooma.com
-'''
-'''
-Alooma's Code Engine allows you to write whatever custom code
-you choose to cleanse, enrich, split, delete, make calls out,
-and do whatever is possible with native Python code that you desire!
-While we ship with just the standard "def transform(event)" function,
-we've written some common code examples below for you to work from.
-Check out our Code Engine docs for even more!
-https://support.alooma.com/hc/en-us/articles/360000698651
-If you have any questions about writing code,
-or want to import a custom library,
-feel free to contact us at support@alooma.com
-'''
-
-import io
-import csv
-import random
 from datetime import datetime
+import random
+import csv
+import io
+
 
 def transform(event):
     input = event['_metadata']['input_label']
 
 # cleanse endicia input. remove event types of postage purchase and refund,
-#cleanse tracking
+# cleanse tracking
 # number and standardize date and time formats
     if input == 'Endicia_InvoiceDetail':
-        if any(k in event['Type'] for k in ("Postage Purchase", "Postage Refund")):
+        if event['Type'] == "Postage Purchase":
             return None
         else:
             event['Tracking Number'] = event['Tracking Number'].replace(
                 "'", "")
-            event['Total Postage Amt'] = fix_endicia_postage(event)
+            event['Total Postage Amt'] = float(event['Total Postage Amt'][1:])
             event = fix_date(event)
             return event
 
 # cleanse shiphero input. standardize dates, quantities (as integer), column
-#for dist channel,label type, and random tracking number for those orders without one
+# for dist channel,label type, and random tracking number for those orders without one
     if input == 'Shiphero_ShipmentsReport':
         event['Label Status'] = "Valid"
         event['Quantity Shipped Error'] = fix_shiphero_qty(event)
@@ -70,29 +45,13 @@ def transform(event):
 # cleanse dhl input. add headers to the csv, remove the first row of the input since it is junk data and standardize
 # dates and times
     if input == 'DHLe-commerce_InvoiceDetail':
-        headers = ["Record Type", "Sold To", "Inventory Positioner", "BOL Number", "Billing Ref", "Billing Ref 2",
-                   "Processing Facility", "Pick From", "Pickup Date", "Pickup Time", "Internal Tracking", "Customer Confirm",
-                   "Delivery Confirm", "Recipient Name", "Recipient Address 1", "Recipient Address 2", "Recipient City",
-                   "Recipient State", "Recipient Zip", "Recipient Country", "VAS Num", "VAS Dec", "Actual Weight",
-                   "UOM Actual Weight", "Billing Weight", "UOM Billing Weight", "Quantity", "UOM Quantity", "Pricing Zone",
-                   "Charge", "Customer Reference"]
-        string = event['message']
-        metadata = event['_metadata']
-        f = io.StringIO(string)
-        reader = csv.reader(f, delimiter=',')
-        event = {}
-        fields = list(reader)[0]
-        event['data'] = dict(zip(headers[:len(fields)], fields))
-        event['_metadata'] = metadata
-
+        event = fix_dhl_headers(event)
         if event['data']['Record Type'] == "HDR":
             return None
-        else:
-            event['data']['Pickup Date'] = str(
-                datetime.strptime(event['data']['Pickup Date'], '%Y%m%d'))
-
+        event['data']['Pickup Date'] = str(
+            datetime.strptime(event['data']['Pickup Date'], '%Y%m%d'))
+        event['data']['Invoice Date'] = fix_dhl_invoice_date(event['_metadata']['file_name'])
         return event
-
 
 # cleanse tsheets input to split data into columns and add date to each row
     if input == 'TSheets_EmployeeJobCosting':
@@ -112,20 +71,6 @@ def transform(event):
 
 # functions
 # -----------------------------------------------------------------------------------------------------------------------
-
-# change endicia postage to float value or 0 based on refund status
-def fix_endicia_postage(event):
-    r = event['Refund Status']
-    t = event['Total Postage Amt']
-    if any(k in r for k in ("Refunded", "Refund Rejected")):
-        t = 0
-        return t
-    else:
-        if t.startswith('$'):
-            z = t.replace(",", "")
-            return float(z[1:])
-        return float(t)
-
 # add a column to shiphero for dist channel. ecomm or wholesale based on condition below
 
 
@@ -190,6 +135,42 @@ def fix_shiphero_label(event):
         g = "Outbound"
     return g
 
+# function to add DHL event headers
+
+
+def fix_dhl_headers(event):
+    headers = ["Record Type", "Sold To", "Inv_Posnr", "BOL", "Billing Ref", "Billing Ref 2",
+               "Shipping Point", "Pick From", "Pickup Date", "Pickup Time", "Internal Tracking", "Customer Confirm",
+               "Delivery Confirm", "Recipient Name", "Recipient Address 1", "Recipient Address 2", "Recipient City",
+               "Recipient State", "Recipient Zip", "Recipient Country", "VAS Num", "VAS Dec", "Actual Weight",
+               "UOM Actual Weight", "Billing Weight", "UOM Billing Weight", "Quantity", "UOM Quantity", "Pricing Zone",
+               "Charge", "Customer Reference 1", "Customer Reference 2", "PRI_Dropoff", "PRI_Sort", "PRI_Stamp",
+               "PRI_Machine", "PRI_Manifest", "PRI_BPM", "PRI_Future_Use 1", "PRI_Future_Use 2", "PRI_Future_Use 3",
+               "Content_Endorsement", "Unassignable_Addrs", "Special_Handling", "Late_Arrival", "USPS_Qualif", "Client_SRD",
+               "SC_Irreg", "Ret_Unassn_Chg", "Ret_Unprocess_Chg", "Ret_Recall_Disc_Chg", "Ret_Dup_Mail_Chg", "Ret_Cont_Assur_Chg",
+               "Move_Update_Return", "GST_Tax", "HST_Tax", "PST_Tax", "VAT_Tax", "Duties", "Tax", "Paper_Invoice_Fee", "Screening_Fee",
+               "Non_Auto_Flats", "FUTURE_USE 1", "Fuel 1", "Min_PickupChg 1", "Future Chg 1", "Future Chg 2", "Future Chg 3",
+               "Future Chg 4", "Future Chg 5", "Future Chg 6", "Future Chg 7", "Future Chg 8", "Future Chg 9", "Future Chg 10",
+               "Future Chg 11", "Future Chg 12", "Future Chg 13", "SC_placehold10", "FUEL 2", "MINPICKUP 2"]
+    string = event['message']
+    metadata = event['_metadata']
+    f = io.StringIO(string)
+    reader = csv.reader(f, delimiter=',')
+    event = {}
+    fields = list(reader)[0]
+    event['data'] = dict(zip(headers[:len(fields)], fields))
+    event['_metadata'] = metadata
+    return event
+
+#function to extract invoice date from the DHL filename 
+
+def fix_dhl_invoice_date(filename):
+    a, b, c = filename.partition('_')
+    d, e, f = c.partition('_')
+    f = f.replace('.csv', "")
+    f = str(datetime.strptime(f, '%Y%m%d'))
+    return f
+
 # global function to fix date formatting
 
 
@@ -232,7 +213,7 @@ def fix_date(event):
             event['Shipment Delivery Date'] = event['Shipment Date']
         return event
 
-    if input == 'Shiphero_ShipmentsReport' or x == 'Shiphero_ShipmentsReport_VOID':
+    if input == 'Shiphero_ShipmentsReport' or input == 'Shiphero_ShipmentsReport_VOID':
         event['Order Date'] = str(datetime.strptime(
             event['Order Date'], '%m/%d/%Y %I:%M %p'))
         event['Created Date'] = str(datetime.strptime(
