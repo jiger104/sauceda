@@ -7,16 +7,23 @@ import io
 def transform(event):
 
     input = event['_metadata']['input_label']
-    routine = switcher(input)
-
-    def switcher(input):
-      cleanse_input = {
-      "Endicia_InvoiceDetail" : cleanse_endicia(event)
-
-      }
-      func = cleanse_input.get()
-      return func()
-
+    if input == 'Endicia_InvoiceDetail':
+        cleanse_endicia(event)
+    elif input == 'Shiphero_ShipmentsReport':
+        cleanse_shiphero_shipmentsreport(event)
+    elif input == 'ShipHero_ShipmentsReport_VOID':
+        cleanse_shiphero_shipmentsreport_void(event)
+    elif input == 'Fedex_InvoiceDetail':
+        cleanse_fedex(event)
+    elif input == 'DHLe-commerce_InvoiceDetail':
+        cleanse_dhl(event)
+    elif input == 'TSheets_EmployeeJobCosting':
+        cleanse_tsheets(event)
+    elif input == 'Shipstation_Aws':
+        cleanse_shipstation(event)
+    elif input == 'APC_InvoiceDetail':
+        cleanse_apc(event)
+    return event
 
 # cleanse endicia input. ignore postage purchase
 # cleanse tracking number and standardize date and time formats
@@ -31,33 +38,34 @@ def cleanse_endicia(event):
 
 # cleanse shiphero input. standardize dates, quantities (as integer), column
 # for dist channel,label type, and random tracking number for those orders without one
-    if input == 'Shiphero_ShipmentsReport':
+def cleanse_shiphero_shipmentsreport(event):
         event['Label Status'] = "Valid"
         event['Quantity Shipped Error'] = fix_shiphero_qty(event)
         event['Dist Channel'] = fix_shiphero_dist(event)
         event['Label Type'] = fix_shiphero_label(event)
         event['Tracking Number'] = fix_shiphero_tracking(event)
         event['Unique Shipment ID'] = fix_shiphero_unique(event)
+        event['Multi-Pkg ID'] = event['Unique Shipment ID'] + ":" + event['Quantity Shipped']
         event['Order Date'], event['Created Date'] = fix_shiphero_date(
             event['Order Date'], event['Created Date'])
         return event
 
 # cleanse shiphero void report
-    if input == 'ShipHero_ShipmentsReport_VOID':
+def cleanse_shiphero_shipmentsreport_void(event):
         event['Label Status'] = "Void"
         event['Order Date'], event['Created Date'] = fix_shiphero_date(
             event['Order Date'], event['Created Date'])
         return event
 
 # cleanse fedex input. standardize dates and times
-    if input == 'Fedex_InvoiceDetail':
+def cleanse_fedex(event):
         event['Invoice Month (yyyymm)'], event['Shipment Date'], event['Shipment Delivery Date'] = fix_fedex_date(
         event['Invoice Month (yyyymm)'], event['Shipment Date'], event['Shipment Delivery Date'])
         return event
 
 # cleanse dhl input. add headers to the csv, remove the first row of the input since it is junk data and standardize
 # dates and times
-    if input == 'DHLe-commerce_InvoiceDetail':
+def cleanse_dhl(event):
         event = fix_dhl_headers(event)
         if event['data']['Record Type'] == "HDR":
             return None
@@ -68,7 +76,7 @@ def cleanse_endicia(event):
         return event
 
 # cleanse tsheets input to split data into columns and add date to each row
-    if input == 'TSheets_EmployeeJobCosting':
+def cleanse_tsheets(event):
         event['date'] = event['_metadata']['file_name'].replace(
             'Tsheets/', "").replace('.csv', "")
         event['project'] = event['original_row'][0].split(" >>")[0]
@@ -78,10 +86,14 @@ def cleanse_endicia(event):
         return event
 
 # cleanse shipstation input. standardize dates
-    if input == 'Shipstation_aws':
+def cleanse_shipstation(event):
         event['Date - Shipped Date'] = fix_shipstation_date(
             event['Date - Shipped Date'])
         return event
+#cleanse apc input. standardize dates
+def cleanse_apc(event):
+    event['InvoiceDate'] = fix_apc_date(event)
+    return event
 
 
 # functions
@@ -111,7 +123,8 @@ def fix_shiphero_unique(event):
     o = event['Order Number']
     c = (datetime.strptime(event['Created Date'], '%m/%d/%Y %I:%M %p'))
     d = datetime.strftime(c, '%m%d%Y-%I%M%p')
-    return (o + "-" + str(d))
+    return (o + ":" + str(d))
+
 
 
 # delete first 8 characters of tracking number of  any DHL domestic shipment on shiphero report, Also add random integer
@@ -238,3 +251,7 @@ def fix_shiphero_date(order_date, created_date):
 def fix_tsheets_date(date):
     date = str(datetime.strptime(event['date'], '%Y-%d-%m'))
     return date
+
+def fix_apc_date(event):
+    event['InvoiceDate'] = str(datetime.strptime(event['InvoiceDate'], '%Y-%m-%d + 'T' + %H:%M:%S'))
+    return event
