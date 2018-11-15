@@ -27,73 +27,90 @@ def transform(event):
 
 # cleanse endicia input. ignore postage purchase
 # cleanse tracking number and standardize date and time formats
+
+
 def cleanse_endicia(event):
     if event['Type'] == "Postage Purchase":
         return None
     else:
         event['Tracking Number'] = event['Tracking Number'].replace("'", "")
         event['Total Postage Amt'] = float(event['Total Postage Amt'][1:])
-        event['Postmark'], event['Date/Time'] = fix_endicia_date(event['Postmark'], event['Date/Time'])
+        event['Postmark'], event['Date/Time'] = fix_endicia_date(
+            event['Postmark'], event['Date/Time'])
         return event
 
 # cleanse shiphero input. standardize dates, quantities (as integer), column
 # for dist channel,label type, and random tracking number for those orders without one
+
+
 def cleanse_shiphero_shipmentsreport(event):
-        event['Label Status'] = "Valid"
-        event['Quantity Shipped Error'] = fix_shiphero_qty(event)
-        event['Dist Channel'] = fix_shiphero_dist(event)
-        event['Label Type'] = fix_shiphero_label(event)
-        event['Tracking Number'] = fix_shiphero_tracking(event)
-        event['Unique Shipment ID'] = fix_shiphero_unique(event)
-        event['Multi-Pkg ID'] = event['Unique Shipment ID'] + ":" + event['Quantity Shipped']
-        event['Order Date'], event['Created Date'] = fix_shiphero_date(
-            event['Order Date'], event['Created Date'])
-        return event
+    event['Label Status'] = "Valid"
+    event['Quantity Shipped Error'] = fix_shiphero_qty(event)
+    event['Dist Channel'] = fix_shiphero_dist(event)
+    event['Label Type'] = fix_shiphero_label(event)
+    event['Tracking Number'] = fix_shiphero_tracking(event)
+    event['Unique Shipment ID'] = fix_shiphero_unique(event)
+    event['Multi-Pkg ID'] = event['Unique Shipment ID'] + \
+        ":" + event['Quantity Shipped']
+    event['Order Date'], event['Created Date'] = fix_shiphero_date(
+        event['Order Date'], event['Created Date'])
+    return event
 
 # cleanse shiphero void report
+
+
 def cleanse_shiphero_shipmentsreport_void(event):
-        event['Label Status'] = "Void"
-        event['Order Date'], event['Created Date'] = fix_shiphero_date(
-            event['Order Date'], event['Created Date'])
-        return event
+    event['Label Status'] = "Void"
+    event['Order Date'], event['Created Date'] = fix_shiphero_date(
+        event['Order Date'], event['Created Date'])
+    return event
 
 # cleanse fedex input. standardize dates and times
+
+
 def cleanse_fedex(event):
-        event['Invoice Month (yyyymm)'], event['Shipment Date'], event['Shipment Delivery Date'] = fix_fedex_date(
+    event['Invoice Month (yyyymm)'], event['Shipment Date'], event['Shipment Delivery Date'] = fix_fedex_date(
         event['Invoice Month (yyyymm)'], event['Shipment Date'], event['Shipment Delivery Date'])
-        return event
+    return event
 
 # cleanse dhl input. add headers to the csv, remove the first row of the input since it is junk data and standardize
 # dates and times
+
+
 def cleanse_dhl(event):
-        event = fix_dhl_headers(event)
-        if event['data']['Record Type'] == "HDR":
-            return None
-        event['data']['Pickup Date'] = str(
-            datetime.strptime(event['data']['Pickup Date'], '%Y%m%d'))
-        event['data']['Invoice Date'] = fix_dhl_invoice_date(
-            event['_metadata']['file_name'])
-        return event
+  event = fix_dhl_header(event)
+  if event['Record Type'] == "HDR":
+    return None
+  else:
+    event['Pickup Date'] = str(
+      datetime.strptime(event['Pickup Date'], '%Y%m%d'))
+    event['Invoice Date'] = fix_dhl_invoice_date(
+      event['_metadata']['file_name'])
+    return event
 
 # cleanse tsheets input to split data into columns and add date to each row
+
+
 def cleanse_tsheets(event):
-        event['date'] = event['_metadata']['file_name'].replace(
-            'Tsheets/', "").replace('.csv', "")
-        event['project'] = event['original_row'][0].split(" >>")[0]
-        event['job_code'] = event['original_row'][0].split(">> ")[1]
-        event['total hours'] = float(event['original_row'][2])
-        event['date'] = fix_tsheets_date(event['date'])
-        return event
+    event['date'] = event['_metadata']['file_name'].replace(
+        'Tsheets/', "").replace('.csv', "")
+    event['project'] = event['original_row'][0].split(" >>")[0]
+    event['job_code'] = event['original_row'][0].split(">> ")[1]
+    event['total hours'] = float(event['original_row'][2])
+    event['date'] = fix_tsheets_date(event['date'])
+    return event
 
 # cleanse shipstation input. standardize dates
+
 def cleanse_shipstation(event):
-        event['Date - Shipped Date'] = fix_shipstation_date(
-            event['Date - Shipped Date'])
-        return event
-#cleanse apc input. standardize dates
-def cleanse_apc(event):
-    event['InvoiceDate'] = fix_apc_date(event)
+    event['Date - Shipped Date'] = fix_shipstation_date(
+        event['Date - Shipped Date'])
     return event
+
+# cleanse apc input. standardize dates
+# def cleanse_apc(event):
+#     event['InvoiceDate'] = fix_apc_date(event)
+#     return event
 
 
 # functions
@@ -124,7 +141,6 @@ def fix_shiphero_unique(event):
     c = (datetime.strptime(event['Created Date'], '%m/%d/%Y %I:%M %p'))
     d = datetime.strftime(c, '%m%d%Y-%I%M%p')
     return (o + ":" + str(d))
-
 
 
 # delete first 8 characters of tracking number of  any DHL domestic shipment on shiphero report, Also add random integer
@@ -166,7 +182,7 @@ def fix_shiphero_label(event):
 # function to add DHL event headers
 
 
-def fix_dhl_headers(event):
+def fix_dhl_header(event):
     headers = ["Record Type", "Sold To", "Inv_Posnr", "BOL", "Billing Ref", "Billing Ref 2",
                "Shipping Point", "Pick From", "Pickup Date", "Pickup Time", "Internal Tracking", "Customer Confirm",
                "Delivery Confirm", "Recipient Name", "Recipient Address 1", "Recipient Address 2", "Recipient City",
@@ -186,7 +202,7 @@ def fix_dhl_headers(event):
     reader = csv.reader(f, delimiter=',')
     event = {}
     fields = list(reader)[0]
-    event['data'] = dict(zip(headers[:len(fields)], fields))
+    event = dict(zip(headers[:len(fields)], fields))
     event['_metadata'] = metadata
     return event
 
@@ -252,6 +268,6 @@ def fix_tsheets_date(date):
     date = str(datetime.strptime(event['date'], '%Y-%d-%m'))
     return date
 
-def fix_apc_date(event):
-    event['InvoiceDate'] = str(datetime.strptime(event['InvoiceDate'], '%Y-%m-%d + 'T' + %H:%M:%S'))
-    return event
+# def fix_apc_date(event):
+#     event['InvoiceDate'] = str(datetime.strptime(event['InvoiceDate'], '%Y-%m-%d + 'T' + %H:%M:%S'))
+#     return event
