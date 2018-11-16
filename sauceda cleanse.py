@@ -16,62 +16,74 @@ def transform(event):
     elif input == 'Fedex_InvoiceDetail':
         cleanse_fedex(event)
     elif input == 'DHLe-commerce_InvoiceDetail':
-        cleanse_dhl(event)
+        event = cleanse_dhl(event)
     elif input == 'TSheets_EmployeeJobCosting':
         cleanse_tsheets(event)
-    elif input == 'Shipstation_Aws':
-        cleanse_shipstation(event)
+    elif input == 'UPS_InvoiceDetail':
+        cleanse_ups(event)
     elif input == 'APC_InvoiceDetail':
         cleanse_apc(event)
     return event
+
+#top level functions to cleanse inputs
+#------------------------------------------------------------------------------------------------------------------------------------------
 
 # cleanse endicia input. ignore postage purchase
 # cleanse tracking number and standardize date and time formats
 
 
 def cleanse_endicia(event):
-    if event['Type'] == "Postage Purchase":
-        return None
-    else:
-        event['Tracking Number'] = event['Tracking Number'].replace("'", "")
-        event['Total Postage Amt'] = float(event['Total Postage Amt'][1:])
-        event['Postmark'], event['Date/Time'] = fix_endicia_date(
-            event['Postmark'], event['Date/Time'])
-        return event
+  if event['Type'] == "Postage Purchase":
+    return None
+  else:
+    event['Tracking Number'] = event['Tracking Number'].replace("'", "")
+    event['Total Postage Amt'] = float(event['Total Postage Amt'][1:])
+    event['Postmark'], event['Date/Time'] = fix_endicia_date(event['Postmark'], event['Date/Time'])
+    return event
 
 # cleanse shiphero input. standardize dates, quantities (as integer), column
 # for dist channel,label type, and random tracking number for those orders without one
 
 
 def cleanse_shiphero_shipmentsreport(event):
-    event['Label Status'] = "Valid"
-    event['Quantity Shipped Error'] = fix_shiphero_qty(event)
-    event['Dist Channel'] = fix_shiphero_dist(event)
-    event['Label Type'] = fix_shiphero_label(event)
-    event['Tracking Number'] = fix_shiphero_tracking(event)
-    event['Unique Shipment ID'] = fix_shiphero_unique(event)
-    event['Multi-Pkg ID'] = event['Unique Shipment ID'] + \
-        ":" + event['Quantity Shipped']
-    event['Order Date'], event['Created Date'] = fix_shiphero_date(
-        event['Order Date'], event['Created Date'])
-    return event
+  event['Label Status'] = "Valid"
+  event['Quantity Shipped Error'] = fix_shiphero_qty(event)
+  event['Dist Channel'] = fix_shiphero_dist(event)
+  event['Label Type'] = fix_shiphero_label(event)
+  event['Tracking Number'] = fix_shiphero_tracking(event)
+  event['Unique Shipment ID'] = fix_shiphero_unique(event)
+  event['Multi-Pkg ID'] = event['Unique Shipment ID'] + ":" + event['Quantity Shipped']
+  event['Order Date'], event['Created Date'] = fix_shiphero_date(event['Order Date'], event['Created Date'])
+  return event
 
 # cleanse shiphero void report
 
 
 def cleanse_shiphero_shipmentsreport_void(event):
-    event['Label Status'] = "Void"
-    event['Order Date'], event['Created Date'] = fix_shiphero_date(
-        event['Order Date'], event['Created Date'])
-    return event
+  event['Label Status'] = "Void"
+  event['Order Date'], event['Created Date'] = fix_shiphero_date(event['Order Date'], event['Created Date'])
+  return event
 
 # cleanse fedex input. standardize dates and times
 
 
 def cleanse_fedex(event):
-    event['Invoice Month (yyyymm)'], event['Shipment Date'], event['Shipment Delivery Date'] = fix_fedex_date(
-        event['Invoice Month (yyyymm)'], event['Shipment Date'], event['Shipment Delivery Date'])
-    return event
+  event['Invoice Month (yyyymm)'], event['Shipment Date'], event['Shipment Delivery Date'] = fix_fedex_date(
+  event['Invoice Month (yyyymm)'], event['Shipment Date'], event['Shipment Delivery Date'])
+  return event
+
+
+# cleanse tsheets input to split data into columns and add date to each row
+
+
+def cleanse_tsheets(event):
+  event['date'] = event['_metadata']['file_name'].replace('Tsheets/', "").replace('.csv', "")
+  event['project'] = event['original_row'][0].split(" >>")[0]
+  event['job_code'] = event['original_row'][0].split(">> ")[1]
+  event['total hours'] = float(event['original_row'][2])
+  event['date'] = fix_tsheets_date(event['date'])
+  return event
+
 
 # cleanse dhl input. add headers to the csv, remove the first row of the input since it is junk data and standardize
 # dates and times
@@ -79,41 +91,24 @@ def cleanse_fedex(event):
 
 def cleanse_dhl(event):
   event = fix_dhl_header(event)
-  if event['Record Type'] == "HDR":
-    return None
-  else:
-    event['Pickup Date'] = str(
-      datetime.strptime(event['Pickup Date'], '%Y%m%d'))
-    event['Invoice Date'] = fix_dhl_invoice_date(
-      event['_metadata']['file_name'])
-    return event
-
-# cleanse tsheets input to split data into columns and add date to each row
+  if event is not None:
+    event['Pickup Date'] = str(datetime.strptime(event['Pickup Date'], '%Y%m%d'))
+    event['Invoice Date'] = fix_dhl_invoice_date(event['_metadata']['file_name'])
+  return event
 
 
-def cleanse_tsheets(event):
-    event['date'] = event['_metadata']['file_name'].replace(
-        'Tsheets/', "").replace('.csv', "")
-    event['project'] = event['original_row'][0].split(" >>")[0]
-    event['job_code'] = event['original_row'][0].split(">> ")[1]
-    event['total hours'] = float(event['original_row'][2])
-    event['date'] = fix_tsheets_date(event['date'])
-    return event
+#cleanse apc input. standardize dates
+def cleanse_apc(event):
+  fix_apc_date(event)
+  return event
 
-# cleanse shipstation input. standardize dates
+#cleanse ups input. add headers / standardize dates
+def cleanse_ups(event):
+  event = fix_ups_header(event)
+  event = fix_ups_dates(event)
+  return event
 
-def cleanse_shipstation(event):
-    event['Date - Shipped Date'] = fix_shipstation_date(
-        event['Date - Shipped Date'])
-    return event
-
-# cleanse apc input. standardize dates
-# def cleanse_apc(event):
-#     event['InvoiceDate'] = fix_apc_date(event)
-#     return event
-
-
-# functions
+# child functions to cleanse inputs
 # -----------------------------------------------------------------------------------------------------------------------
 # add a column to shiphero for dist channel. ecomm or wholesale based on condition below
 
@@ -183,7 +178,7 @@ def fix_shiphero_label(event):
 
 
 def fix_dhl_header(event):
-    headers = ["Record Type", "Sold To", "Inv_Posnr", "BOL", "Billing Ref", "Billing Ref 2",
+  headers = ["Record Type", "Sold To", "Inv_Posnr", "BOL", "Billing Ref", "Billing Ref 2",
                "Shipping Point", "Pick From", "Pickup Date", "Pickup Time", "Internal Tracking", "Customer Confirm",
                "Delivery Confirm", "Recipient Name", "Recipient Address 1", "Recipient Address 2", "Recipient City",
                "Recipient State", "Recipient Zip", "Recipient Country", "VAS Num", "VAS Dec", "Actual Weight",
@@ -195,20 +190,21 @@ def fix_dhl_header(event):
                "Move_Update_Return", "GST_Tax", "HST_Tax", "PST_Tax", "VAT_Tax", "Duties", "Tax", "Paper_Invoice_Fee", "Screening_Fee",
                "Non_Auto_Flats", "FUTURE_USE 1", "Fuel 1", "Min_PickupChg 1", "Future Chg 1", "Future Chg 2", "Future Chg 3",
                "Future Chg 4", "Future Chg 5", "Future Chg 6", "Future Chg 7", "Future Chg 8", "Future Chg 9", "Future Chg 10",
-               "Future Chg 11", "Future Chg 12", "Future Chg 13", "SC_placehold10", "FUEL 2", "MINPICKUP 2"]
-    string = event['message']
-    metadata = event['_metadata']
-    f = io.StringIO(string)
-    reader = csv.reader(f, delimiter=',')
-    event = {}
-    fields = list(reader)[0]
-    event = dict(zip(headers[:len(fields)], fields))
-    event['_metadata'] = metadata
+               "Future Chg 11", "Future Chg 12", "Future Chg 13", "SC_placehold10", "FUEL 2", "MINPICKUP 2", "ZADJ"]
+  string = event['message']
+  metadata = event['_metadata']
+  f = io.StringIO(string)
+  reader = csv.reader(f, delimiter=',')
+  event = {}
+  fields = list(reader)[0]
+  event = dict(zip(headers[:len(fields)], fields))
+  event['_metadata'] = metadata
+  if event['Record Type'] == 'HDR':
+    return None
+  else:
     return event
 
-# function to extract invoice date from the DHL filename
-
-
+#function to add invoice date field to dhl events based on the filename  
 def fix_dhl_invoice_date(filename):
     a, b, c = filename.partition('_')
     d, e, f = c.partition('_')
@@ -216,6 +212,20 @@ def fix_dhl_invoice_date(filename):
     f = str(datetime.strptime(f, '%Y%m%d'))
     return f
 
+#function to add UPS event headers
+def fix_ups_header(event):
+  headers = ["Account Number", "Invoice Number", 'Original Country or Territory', 'Invoice Date', 'Pickup Record', 'Due Date', 'Pickup Date',
+            'Tracking Number', 'Service Level', 'Zone', 'Import Date', 'Amount Due', 'Published Charge', 'Incentives', 'Net Amount', "Empty"]
+  index = 0
+  for a in event['original_row']:
+    event[headers[index]] = a
+    index += 1
+  event['original_row'] = ""  
+  return event
+    
+
+#date standardization functions
+#-------------------------------------------------------------------------------------------------------------------------------------------
 
 def fix_shipstation_date(date):
     try:
@@ -268,6 +278,21 @@ def fix_tsheets_date(date):
     date = str(datetime.strptime(event['date'], '%Y-%d-%m'))
     return date
 
-# def fix_apc_date(event):
-#     event['InvoiceDate'] = str(datetime.strptime(event['InvoiceDate'], '%Y-%m-%d + 'T' + %H:%M:%S'))
-#     return event
+def fix_apc_date(event):
+    event['InvoiceDate'] = str(event['InvoiceDate'].replace('T',"")) 
+    event['InvoiceDate'] = str(datetime.strptime(event['InvoiceDate'], '%Y-%m-%d%H:%M:%S'))
+    event['AWBDate'] = str(event['AWBDate'].replace('T',"")) 
+    event['AWBDate'] = str(datetime.strptime(event['AWBDate'], '%Y-%m-%d%H:%M:%S'))
+    return event
+    
+def fix_ups_dates(event):
+    pass
+    # event['Invoice Date'] = str(datetime.strptime(event['Invoice Date'], '%m/%d/%Y')
+    # return event
+
+
+
+
+
+
+
