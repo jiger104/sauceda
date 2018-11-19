@@ -21,7 +21,7 @@ def transform(event):
     elif input == 'DHLe-commerce_InvoiceDetail':
         event = cleanse_dhl(event)
     elif input == 'UPS_InvoiceDetail':
-        if not event['original_row'] or any(k in event['original_row'] for k in ("Total", "Account Number", "Report Name")):
+        if not event['original_row'] or any(k in event['original_row'] for k in ("Total", "Account Number", "Report name : Invoice Detail Report")):
           return None
         else:
           cleanse_ups(event)
