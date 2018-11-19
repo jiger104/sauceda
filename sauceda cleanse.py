@@ -21,7 +21,10 @@ def transform(event):
     elif input == 'DHLe-commerce_InvoiceDetail':
         event = cleanse_dhl(event)
     elif input == 'UPS_InvoiceDetail':
-        cleanse_ups(event)
+        if not event['original_row'] or any(k in event['original_row'] for k in ("Total", "Account Number", "Report Name")):
+          return None
+        else:
+          cleanse_ups(event)
     elif input == 'APC_InvoiceDetail':
         cleanse_apc(event)
     return event
@@ -80,6 +83,7 @@ def cleanse_dhl(event):
   if event is not None:
     event['Pickup Date'] = str(datetime.strptime(event['Pickup Date'], '%Y%m%d'))
     event['Invoice Date'] = fix_dhl_invoice_date(event['_metadata']['file_name'])
+    event['Customer Reference 1'] = re.sub("\D", "", event['Customer Reference 1'])
   return event
 
 
@@ -91,7 +95,7 @@ def cleanse_apc(event):
 #cleanse ups input. add headers / standardize dates
 def cleanse_ups(event):
   event = fix_ups_header(event)
-  event['data']['Invoice Date'] = str(datetime.strptime(event['data']['Invoice Date'], '%m/%d/%Y'))
+  event['Invoice Date'] = str(datetime.strptime(event['Invoice Date'], '%m/%d/%Y'))
   return event
 
 # child functions to cleanse inputs
@@ -200,13 +204,12 @@ def fix_dhl_invoice_date(filename):
 
 #function to add UPS event headers
 def fix_ups_header(event):
-  headers = ["Account Number", "Invoice Number", 'Original Country or Territory', 'Invoice Date', 'Pickup Record', 'Due Date', 'Pickup Date',
-            'Tracking Number', 'Service Level', 'Zone', 'Import Date', 'Amount Due', 'Published Charge', 'Incentives', 'Net Amount', "Empty"]
+  headers1 = ["Account Number", "Invoice Number", 'Original Country or Territory', 'Invoice Date', 'Pickup Record', 'Due Date', 'Pickup Date',
+            'Tracking Number', 'Service Level', 'Zone', 'Import Date', 'Amount Due', 'Published Charge', 'Incentives', 'Net Amount', "Blank"]
   index = 0
   original_row = event['original_row']
-  event['data'] = {}
   for item in original_row:
-    event['data'][headers[index]] = item
+    event[headers1[index]] = item
     index += 1
   event['original_row'] = ""
   return event
