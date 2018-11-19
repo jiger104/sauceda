@@ -2,13 +2,16 @@ from datetime import datetime
 import random
 import csv
 import io
-
+import re
 
 def transform(event):
 
     input = event['_metadata']['input_label']
     if input == 'Endicia_InvoiceDetail':
-        cleanse_endicia(event)
+        if event['Type'] == "Postage Purchase":
+          return None
+        else:
+          cleanse_endicia(event)
     elif input == 'Shiphero_ShipmentsReport':
         cleanse_shiphero_shipmentsreport(event)
     elif input == 'ShipHero_ShipmentsReport_VOID':
@@ -17,8 +20,6 @@ def transform(event):
         cleanse_fedex(event)
     elif input == 'DHLe-commerce_InvoiceDetail':
         event = cleanse_dhl(event)
-    elif input == 'TSheets_EmployeeJobCosting':
-        cleanse_tsheets(event)
     elif input == 'UPS_InvoiceDetail':
         cleanse_ups(event)
     elif input == 'APC_InvoiceDetail':
@@ -33,9 +34,6 @@ def transform(event):
 
 
 def cleanse_endicia(event):
-  if event['Type'] == "Postage Purchase":
-    return None
-  else:
     event['Tracking Number'] = event['Tracking Number'].replace("'", "")
     event['Total Postage Amt'] = float(event['Total Postage Amt'][1:])
     event['Postmark'], event['Date/Time'] = fix_endicia_date(event['Postmark'], event['Date/Time'])
@@ -73,18 +71,6 @@ def cleanse_fedex(event):
   return event
 
 
-# cleanse tsheets input to split data into columns and add date to each row
-
-
-def cleanse_tsheets(event):
-  event['date'] = event['_metadata']['file_name'].replace('Tsheets/', "").replace('.csv', "")
-  event['project'] = event['original_row'][0].split(" >>")[0]
-  event['job_code'] = event['original_row'][0].split(">> ")[1]
-  event['total hours'] = float(event['original_row'][2])
-  event['date'] = fix_tsheets_date(event['date'])
-  return event
-
-
 # cleanse dhl input. add headers to the csv, remove the first row of the input since it is junk data and standardize
 # dates and times
 
@@ -105,7 +91,7 @@ def cleanse_apc(event):
 #cleanse ups input. add headers / standardize dates
 def cleanse_ups(event):
   event = fix_ups_header(event)
-  event = fix_ups_dates(event)
+  event['data']['Invoice Date'] = str(datetime.strptime(event['data']['Invoice Date'], '%m/%d/%Y'))
   return event
 
 # child functions to cleanse inputs
@@ -217,10 +203,12 @@ def fix_ups_header(event):
   headers = ["Account Number", "Invoice Number", 'Original Country or Territory', 'Invoice Date', 'Pickup Record', 'Due Date', 'Pickup Date',
             'Tracking Number', 'Service Level', 'Zone', 'Import Date', 'Amount Due', 'Published Charge', 'Incentives', 'Net Amount', "Empty"]
   index = 0
-  for a in event['original_row']:
-    event[headers[index]] = a
+  original_row = event['original_row']
+  event['data'] = {}
+  for item in original_row:
+    event['data'][headers[index]] = item
     index += 1
-  event['original_row'] = ""  
+  event['original_row'] = ""
   return event
     
 
@@ -273,11 +261,6 @@ def fix_shiphero_date(order_date, created_date):
         created_date, '%m/%d/%Y %I:%M %p'))
     return order_date, created_date
 
-
-def fix_tsheets_date(date):
-    date = str(datetime.strptime(event['date'], '%Y-%d-%m'))
-    return date
-
 def fix_apc_date(event):
     event['InvoiceDate'] = str(event['InvoiceDate'].replace('T',"")) 
     event['InvoiceDate'] = str(datetime.strptime(event['InvoiceDate'], '%Y-%m-%d%H:%M:%S'))
@@ -285,10 +268,6 @@ def fix_apc_date(event):
     event['AWBDate'] = str(datetime.strptime(event['AWBDate'], '%Y-%m-%d%H:%M:%S'))
     return event
     
-def fix_ups_dates(event):
-    pass
-    # event['Invoice Date'] = str(datetime.strptime(event['Invoice Date'], '%m/%d/%Y')
-    # return event
 
 
 
